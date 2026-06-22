@@ -1,0 +1,53 @@
+# Gateway variant with tail_sampling REMOVED, for ITER_04 experiment #4 (sampling
+# & cost). Run with this vs gateway.yaml and compare otelcol_exporter_sent_spans
+# across the two runs to quantify what sampling sheds. Swap back to gateway.yaml.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+  attributes/scrub:
+    actions:
+      - {key: http.request.header.user_agent, action: delete}
+      - {key: net.sock.peer.addr, action: delete}
+  batch:
+    send_batch_size: 1024
+    timeout: 5s
+
+exporters:
+  otlp/jaeger:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    resource_to_telemetry_conversion:
+      enabled: true
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, attributes/scrub, batch]
+      exporters: [otlp/jaeger]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/loki]
+  telemetry:
+    metrics:
+      address: 0.0.0.0:8888

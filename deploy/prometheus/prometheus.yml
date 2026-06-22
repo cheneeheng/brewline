@@ -1,0 +1,26 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/rules.yml
+
+scrape_configs:
+  # Application + business metrics, fanned out by the gateway's prometheus exporter.
+  - job_name: otel-gateway
+    static_configs:
+      - targets: ["gateway-collector:8889"]
+
+  # Collector self-observability (refused/dropped spans for experiment #3/#4).
+  - job_name: otel-collectors
+    static_configs:
+      - targets: ["edge-collector:8888", "gateway-collector:8888"]
+
+  # RabbitMQ built-in Prometheus plugin — the honest source of queue depth.
+  - job_name: rabbitmq
+    static_configs:
+      - targets: ["rabbitmq:15692"]
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

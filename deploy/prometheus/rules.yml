@@ -1,0 +1,42 @@
+# SLO recording + multi-window burn-rate alerting (ITER_04).
+# NOTE: the Prometheus exporter rewrites OTel metric names — dots become
+# underscores and monotonic counters gain a `_total` suffix. These rules
+# reference the TRANSLATED series, not the OTel instrument names.
+groups:
+  - name: brewline-slo-recording
+    rules:
+      # Latency SLI: p99 of the explicit-bucket order-duration histogram (seconds).
+      - record: brewline:order_latency_p99_seconds:5m
+        expr: histogram_quantile(0.99, sum(rate(brewline_order_duration_seconds_bucket[5m])) by (le))
+
+      # Payment-success SLI: failure ratio over short and long windows.
+      - record: brewline:payment_failure_ratio:5m
+        expr: sum(rate(brewline_payment_failures_total[5m])) / clamp_min(sum(rate(brewline_orders_placed_total[5m])), 1)
+      - record: brewline:payment_failure_ratio:1h
+        expr: sum(rate(brewline_payment_failures_total[1h])) / clamp_min(sum(rate(brewline_orders_placed_total[1h])), 1)
+
+  - name: brewline-slo-alerts
+    rules:
+      # Latency SLO: 99% of POST /orders under 800ms.
+      - alert: BrewlineLatencySLOBreach
+        expr: brewline:order_latency_p99_seconds:5m > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          slo: latency
+        annotations:
+          summary: "p99 POST /orders latency above the 800ms SLO"
+
+      # Payment-success SLO: >= 99.5% (0.5% error budget). Fast-burn factor 14.4
+      # on a short AND a long window simultaneously — the standard SRE pattern.
+      - alert: BrewlinePaymentSuccessBurnRate
+        expr: |
+          (brewline:payment_failure_ratio:5m > (14.4 * 0.005))
+          and
+          (brewline:payment_failure_ratio:1h > (14.4 * 0.005))
+        for: 2m
+        labels:
+          severity: critical
+          slo: payment_success
+        annotations:
+          summary: "Payment-success error budget burning fast (multi-window)"

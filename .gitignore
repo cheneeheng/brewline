@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# Env
+.env
+
+# Go
+/services/inventory/inventory
+
+# OS
+.DS_Store

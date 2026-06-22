@@ -1,0 +1,64 @@
+{
+  "uid": "brewline-slo",
+  "title": "SLO & error budget",
+  "tags": ["brewline"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": {"from": "now-1h", "to": "now"},
+  "templating": {"list": []},
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Latency SLI: p99 POST /orders vs 800ms target",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {"unit": "s", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 0.8}]}},
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "targets": [
+        {"refId": "A", "expr": "brewline:order_latency_p99_seconds:5m", "legendFormat": "p99"},
+        {"refId": "B", "expr": "vector(0.8)", "legendFormat": "target"}
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Payment-success SLI (target 99.5%)",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {"unit": "percentunit", "decimals": 3, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 0.995}]}},
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "targets": [
+        {"refId": "A", "expr": "1 - brewline:payment_failure_ratio:5m", "legendFormat": "success ratio"}
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Payment-success burn rate (budget 0.5%)",
+      "description": "Burn rate = failure ratio / error budget. >1 burns budget faster than allowed.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "targets": [
+        {"refId": "A", "expr": "brewline:payment_failure_ratio:5m / 0.005", "legendFormat": "5m burn"},
+        {"refId": "B", "expr": "brewline:payment_failure_ratio:1h / 0.005", "legendFormat": "1h burn"}
+      ]
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "Active Brewline alerts",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "targets": [
+        {"refId": "A", "expr": "ALERTS{alertname=~\"Brewline.*\"}", "format": "table", "instant": true}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,218 @@
+name: brewline
+
+# Shared OTel wiring: every service exports OTLP/gRPC to the edge collector.
+x-otel-env: &otel-env
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://edge-collector:4317
+  OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+  OTEL_TRACES_EXPORTER: otlp
+  OTEL_METRICS_EXPORTER: otlp
+  OTEL_LOGS_EXPORTER: otlp
+  OTEL_RESOURCE_ATTRIBUTES: service.namespace=brewline,deployment.environment=local
+
+services:
+  # ---------- Datastores & broker ----------
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-brewline}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-brewline}
+      POSTGRES_DB: ${POSTGRES_DB:-brewline}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-brewline}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    ports: ["5432:5432"]
+
+  redis:
+    image: redis:7
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-brewline}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-brewline}
+    volumes:
+      - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    ports: ["5672:5672", "15672:15672", "15692:15692"]
+
+  # ---------- One-shot migrations (complete before dependents start) ----------
+  order-migrate:
+    build: ../services/order
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://brewline:brewline@postgres:5432/brewline
+    depends_on:
+      postgres: {condition: service_healthy}
+    restart: "no"
+
+  inventory-migrate:
+    image: postgres:16
+    entrypoint: ["sh", "-c", "psql postgresql://brewline:brewline@postgres:5432/brewline -f /init/inventory_init.sql"]
+    volumes:
+      - ./db:/init:ro
+    depends_on:
+      postgres: {condition: service_healthy}
+    restart: "no"
+
+  # ---------- Application services ----------
+  storefront:
+    build: ../services/storefront
+    environment:
+      <<: *otel-env
+      OTEL_SERVICE_NAME: storefront
+      ORDER_URL: http://order:8000
+    depends_on:
+      order: {condition: service_started}
+      edge-collector: {condition: service_started}
+    ports: ["8000:8000"]
+
+  order:
+    build: ../services/order
+    environment:
+      <<: *otel-env
+      OTEL_SERVICE_NAME: order
+      DATABASE_URL: postgresql+asyncpg://brewline:brewline@postgres:5432/brewline
+      PAYMENT_URL: http://payment:8000
+      INVENTORY_URL: http://inventory:8080
+      RABBITMQ_URL: amqp://brewline:brewline@rabbitmq:5672/
+      BROKER_PROPAGATION: ${BROKER_PROPAGATION:-on}
+      CARDINALITY_MODE: ${CARDINALITY_MODE:-normal}
+    depends_on:
+      postgres: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
+      order-migrate: {condition: service_completed_successfully}
+      payment: {condition: service_started}
+      inventory: {condition: service_started}
+      edge-collector: {condition: service_started}
+    ports: ["8001:8000"]
+
+  payment:
+    build: ../services/payment
+    environment:
+      <<: *otel-env
+      OTEL_SERVICE_NAME: payment
+      PAYMENT_FAILURE_RATE: ${PAYMENT_FAILURE_RATE:-0.02}
+      PAYMENT_LATENCY_MS: ${PAYMENT_LATENCY_MS:-40}
+    depends_on:
+      edge-collector: {condition: service_started}
+    ports: ["8002:8000"]
+
+  inventory:
+    build: ../services/inventory
+    environment:
+      <<: *otel-env
+      OTEL_SERVICE_NAME: inventory
+      DATABASE_URL: postgres://brewline:brewline@postgres:5432/brewline
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      inventory-migrate: {condition: service_completed_successfully}
+      edge-collector: {condition: service_started}
+    ports: ["8080:8080"]
+
+  fulfillment:
+    build: ../services/fulfillment
+    environment:
+      <<: *otel-env
+      OTEL_SERVICE_NAME: fulfillment
+      DATABASE_URL: postgresql+asyncpg://brewline:brewline@postgres:5432/brewline
+      RABBITMQ_URL: amqp://brewline:brewline@rabbitmq:5672/
+      PREP_SECONDS: ${PREP_SECONDS:-2}
+      BROKER_PROPAGATION: ${BROKER_PROPAGATION:-on}
+    depends_on:
+      postgres: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
+      order-migrate: {condition: service_completed_successfully}
+      edge-collector: {condition: service_started}
+
+  notification:
+    build: ../services/notification
+    environment:
+      <<: *otel-env
+      OTEL_SERVICE_NAME: notification
+      RABBITMQ_URL: amqp://brewline:brewline@rabbitmq:5672/
+      BROKER_PROPAGATION: ${BROKER_PROPAGATION:-on}
+    depends_on:
+      rabbitmq: {condition: service_healthy}
+      edge-collector: {condition: service_started}
+
+  # ---------- Telemetry pipeline ----------
+  # Collector pinned: processor config schemas drift across releases (ITER_04 §03).
+  edge-collector:
+    image: otel/opentelemetry-collector-contrib:0.105.0
+    # For experiment #3, override: command: ["--config=/etc/otelcol/edge.weak.yaml"]
+    command: ["--config=/etc/otelcol/edge.yaml"]
+    volumes:
+      - ../collector/edge.yaml:/etc/otelcol/edge.yaml:ro
+      - ../collector/edge.weak.yaml:/etc/otelcol/edge.weak.yaml:ro
+    depends_on:
+      gateway-collector: {condition: service_started}
+    ports: ["4317:4317", "4318:4318"]
+
+  gateway-collector:
+    image: otel/opentelemetry-collector-contrib:0.105.0
+    # For experiment #4, override: command: ["--config=/etc/otelcol/gateway.nosample.yaml"]
+    command: ["--config=/etc/otelcol/gateway.yaml"]
+    volumes:
+      - ../collector/gateway.yaml:/etc/otelcol/gateway.yaml:ro
+      - ../collector/gateway.nosample.yaml:/etc/otelcol/gateway.nosample.yaml:ro
+    depends_on:
+      jaeger: {condition: service_started}
+      loki: {condition: service_started}
+    ports: ["8889:8889"]
+
+  # ---------- Telemetry backends & UIs ----------
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports: ["16686:16686"]
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules.yml:/etc/prometheus/rules.yml:ro
+    ports: ["9090:9090"]
+
+  loki:
+    image: grafana/loki:3.1.0
+    command: ["-config.file=/etc/loki/loki-config.yaml"]
+    volumes:
+      - ./loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+    ports: ["3100:3100"]
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
+      - ./grafana/dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml:ro
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards/json:ro
+    depends_on:
+      prometheus: {condition: service_started}
+      loki: {condition: service_started}
+      jaeger: {condition: service_started}
+    ports: ["3000:3000"]
+
+volumes:
+  pgdata:

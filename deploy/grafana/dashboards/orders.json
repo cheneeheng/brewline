@@ -1,0 +1,58 @@
+{
+  "uid": "brewline-orders",
+  "title": "Order business metrics",
+  "tags": ["brewline"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": {"from": "now-15m", "to": "now"},
+  "templating": {"list": []},
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Orders placed (paid vs failed)",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "targets": [
+        {"refId": "A", "expr": "sum by (outcome) (rate(brewline_orders_placed_total[5m]))", "legendFormat": "{{outcome}}"}
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Order value distribution (p50/p95)",
+      "description": "No data until orders flow — see empty-state note.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "targets": [
+        {"refId": "A", "expr": "histogram_quantile(0.50, sum(rate(brewline_order_value_bucket[5m])) by (le))", "legendFormat": "p50"},
+        {"refId": "B", "expr": "histogram_quantile(0.95, sum(rate(brewline_order_value_bucket[5m])) by (le))", "legendFormat": "p95"}
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Payment failure rate",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "decimals": 3}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "targets": [
+        {"refId": "A", "expr": "sum(rate(brewline_payment_failures_total[5m])) / clamp_min(sum(rate(brewline_orders_placed_total[5m])), 1)", "legendFormat": "failure rate"}
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Queue depth (RabbitMQ)",
+      "description": "Honest source: RabbitMQ Prometheus plugin (not a worker-side gauge).",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "targets": [
+        {"refId": "A", "expr": "sum by (queue) (rabbitmq_queue_messages_ready)", "legendFormat": "ready {{queue}}"},
+        {"refId": "B", "expr": "sum by (queue) (rabbitmq_queue_messages_unacked)", "legendFormat": "unacked {{queue}}"}
+      ]
+    }
+  ]
+}
