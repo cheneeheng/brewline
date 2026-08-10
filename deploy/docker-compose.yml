@@ -7,6 +7,16 @@ x-otel-env: &otel-env
   OTEL_TRACES_EXPORTER: otlp
   OTEL_METRICS_EXPORTER: otlp
   OTEL_LOGS_EXPORTER: otlp
+  # Exporting logs needs BOTH: OTEL_LOGS_EXPORTER selects the exporter, and this
+  # flag makes opentelemetry-instrument attach the SDK LoggingHandler to the root
+  # logger. Without it records are only enriched, never shipped — Loki stays empty
+  # (ITER_03 §04, step 2).
+  OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED: "true"
+  # Pin the HTTP semantic conventions to the stable set, so instrumentation emits
+  # http.server.request.duration (seconds) and http.response.status_code — the
+  # series and label the RED dashboard queries. Without the opt-in the old
+  # http_server_duration_milliseconds_* names are emitted and the panels are empty.
+  OTEL_SEMCONV_STABILITY_OPT_IN: http
   OTEL_RESOURCE_ATTRIBUTES: service.namespace=brewline,deployment.environment=local
 
 services:

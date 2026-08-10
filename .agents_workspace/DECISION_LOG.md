@@ -71,4 +71,36 @@ generic per-service RED latency panels still reference `http_server_*` and may s
 data if the pinned instrumentation uses a different name — documented in README.
 
 **Outcome:** Implemented in `services/order/app/metrics.py`, `prometheus/rules.yml`,
-dashboards.
+dashboards. The `http_server_*` naming risk noted above was closed in Entry 4 by pinning
+the semconv opt-in.
+
+### Entry 4
+
+**Type:** Decision
+**Mode:** Autonomous
+**Timestamp:** 2026-08-10T00:00:00Z
+**Task:** Plan-compliance review of the implementation against SKELETON + ITER_01..04.
+
+**Context:** Three findings needed a judgment call rather than a mechanical fix.
+1. ITER_03 §04 requires OTLP log export, but `OTEL_LOGS_EXPORTER=otlp` alone does not make
+   `opentelemetry-instrument` attach the SDK logging handler — this is exactly the "Loki stays
+   empty" failure the plan warns about.
+2. ITER_04 §04 says to pin the instrumentation version so the HTTP duration series name is
+   deterministic. Pinning every `opentelemetry-*` package to a version I cannot build-verify is
+   riskier than pinning the *convention*.
+3. ITER_04 §04 names the gateway trace stage `attributes`/`filter`; only `attributes/scrub` exists.
+
+**Decision:**
+1. Added `OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true` to the shared compose OTel env.
+2. Set `OTEL_SEMCONV_STABILITY_OPT_IN=http` in the same block instead of pinning package versions.
+   It fixes the emitted names (`http.server.request.duration` in seconds,
+   `http.response.status_code`) to the stable set the RED dashboard already queries, is a no-op on
+   instrumentation versions that predate the flag, and leaves the dependency ranges untouched.
+3. Left the `filter` processor out. The plan's own excerpt configures only `attributes/scrub`, and
+   nothing in the MVP names spans or metrics to drop; adding an empty `filter` would be dead config.
+
+**Impact / Risk:** (1) and (2) change what telemetry the services emit — the intended change, and
+both are documented in README "Notes & boundaries". Neither was verified against a running stack.
+
+**Outcome:** Applied to `deploy/docker-compose.yml` and `README.md`; also added the hand-set pgx /
+go-redis span attributes ITER_01 §03 calls for to `services/inventory/main.go`.

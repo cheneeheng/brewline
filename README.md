@@ -89,11 +89,17 @@ in memory; use the exporter counter.)
 
 ## Notes & boundaries
 
-- **HTTP RED metric naming.** The per-service RED panels query
-  `http_server_request_duration_seconds_*` (current stable HTTP semconv). If your
-  pinned instrumentation emits the older `http_server_duration_milliseconds_*`, update
-  the RED dashboard queries and units to match. The SLO latency panel/rule uses the
-  custom `brewline_order_duration_seconds` histogram, which is stable regardless.
+- **HTTP RED metric naming.** Compose sets `OTEL_SEMCONV_STABILITY_OPT_IN=http` for
+  every service, so instrumentation emits the stable HTTP conventions
+  (`http.server.request.duration` in seconds, `http.response.status_code`) that the
+  RED panels query. Drop that variable and the older
+  `http_server_duration_milliseconds_*` names come back and the panels go empty. The
+  SLO latency panel/rule uses the custom `brewline_order_duration_seconds` histogram,
+  which is stable either way.
+- **Log export needs two switches.** `OTEL_LOGS_EXPORTER=otlp` picks the exporter;
+  `OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true` attaches the SDK logging
+  handler to the root logger. Set only the first and records are enriched with
+  `trace_id` but never shipped — Loki stays empty.
 - **Single gateway only.** Tail sampling is correct because every span of a trace
   reaches the one gateway. Multi-gateway needs trace-ID-aware routing via the
   `loadbalancing` exporter (deliberately out of MVP scope).
@@ -101,4 +107,3 @@ in memory; use the exporter counter.)
   end-to-end trace; the gateway `tail_sampling.decision_wait` (15s) must exceed it.
 - No auth/CORS: the only callers are the load generator and internal service-to-service
   traffic on the compose network (deferred, see ITER_04 Out of MVP scope).
-```
