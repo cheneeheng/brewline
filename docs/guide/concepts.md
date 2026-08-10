@@ -82,7 +82,7 @@ mistake that leaves Loki empty:
 Because the same `trace_id` is on both the Jaeger span and the Loki line, Grafana's
 Loki datasource has a **derived field** ([`deploy/grafana/datasources.yaml`](../../deploy/grafana/datasources.yaml))
 that turns `trace_id` into a link straight to the Jaeger trace. See
-[Observe metrics and logs](how-to/observe-metrics-and-logs.md).
+[Observe metrics and logs](how-to/HT-02-observe-metrics-and-logs.md).
 
 ## Metrics: RED + business, and cardinality discipline
 
@@ -135,13 +135,15 @@ Two SLOs are defined as Prometheus rules in
 - **Payment success:** ≥ 99.5%, i.e. `1 - failures/placed`.
 
 A **multi-window burn-rate alert** (fast-burn factor 14.4 on a short *and* a long
-window) fires when the error budget is burning too fast. You make it fire by dialing
-`PAYMENT_FAILURE_RATE` up — see [SLOs and burn-rate alerts](how-to/slos-and-alerts.md).
+window) fires when the error budget is burning too fast. Read what the SLOs measure in
+[HT-03 — SLOs and burn-rate alerts](how-to/HT-03-slos-and-alerts.md); make the alert
+fire by dialing `PAYMENT_FAILURE_RATE` up in
+[OP-03 — SLO alert drill](operations/OP-03-slo-alert-drill.md).
 
 ## Where the knobs are
 
 Everything you toggle while learning is an environment variable in `.env`
-(documented in [Install and configure](operations/install-and-configure.md)):
+(documented in [Install and configure](operations/OP-01-install-and-configure.md)):
 `PAYMENT_FAILURE_RATE`, `PAYMENT_LATENCY_MS`, `PREP_SECONDS`, `BROKER_PROPAGATION`,
 `CARDINALITY_MODE`. The collector experiments swap config files instead
 (`edge.weak.yaml`, `gateway.nosample.yaml`).

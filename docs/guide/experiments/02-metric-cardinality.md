@@ -3,7 +3,11 @@
 **Teaches:** why high-cardinality identifiers belong on traces and logs, never on
 metric labels.
 
-**Time:** ~10 minutes. **Reversible:** yes.
+**Prerequisites:** a running stack ([Getting started](../getting-started.md)); k6 to
+drive load; write access to `.env`; permission to recreate containers.
+**Time / impact:** ~10 minutes. No downtime. Reversible, with one caveat: the series
+this creates stay in Prometheus until they age out of the head block. That is memory
+only — no data is lost and nothing needs cleaning up.
 
 ## Background
 
@@ -12,7 +16,7 @@ labels (`outcome`, `sku`) are cheap. Attach an unbounded identifier like `order_
 and you mint a brand-new series for every order — memory and scrape cost grow without
 limit. Brewline keeps `order_id` off metrics by default; `CARDINALITY_MODE=high` adds
 it on purpose (see
-[`services/order/app/metrics.py`](../../services/order/app/metrics.py)).
+[`services/order/app/metrics.py`](../../../services/order/app/metrics.py)).
 
 ## Establish a baseline
 

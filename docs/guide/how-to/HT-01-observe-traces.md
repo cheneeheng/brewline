@@ -1,9 +1,10 @@
-# How-to: Observe traces
+# HT-01 — Observe traces
 
 Goal: read a Brewline order trace in Jaeger and recognize each hop.
 
 **Prerequisites:** the stack is running and you have placed at least one order
 (see [Getting started](../getting-started.md)).
+**Time:** ~10 minutes. This page is read-only — it changes nothing.
 
 ## Find a trace
 

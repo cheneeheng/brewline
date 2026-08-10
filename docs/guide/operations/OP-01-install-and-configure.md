@@ -1,4 +1,4 @@
-# Install and configure
+# OP-01 — Install and configure
 
 Operator reference for standing Brewline up and tuning it. For the learner happy-path
 see [Getting started](../getting-started.md).
@@ -16,7 +16,7 @@ No host Python or Go toolchain is required; services build in containers.
 
 ## Pinned images
 
-These are pinned in [`deploy/docker-compose.yml`](../../deploy/docker-compose.yml).
+These are pinned in [`deploy/docker-compose.yml`](../../../deploy/docker-compose.yml).
 The collector pin matters most — processor config schemas drift across releases.
 
 | Component | Image / tag |
@@ -80,14 +80,14 @@ recreate the affected service(s):
 
 | Variable | Default | Range | Effect | Recreate |
 |---|---|---|---|---|
-| `PAYMENT_FAILURE_RATE` | `0.02` | 0.0–1.0 | Fraction of charges declined. Drives the payment-success SLO. | `payment` |
+| `PAYMENT_FAILURE_RATE` | `0.02` | 0.0–1.0 | Fraction of charges declined. Drives the payment-success SLO; raise it for [OP-03](OP-03-slo-alert-drill.md). | `payment` |
 | `PAYMENT_LATENCY_MS` | `40` | ≥ 0 | Base charge latency (jittered). Raise to breach the latency SLO. | `payment` |
 | `PREP_SECONDS` | `2` | ≥ 0 | Simulated kitchen prep delay. Extends end-to-end trace time. | `fulfillment` |
 | `BROKER_PROPAGATION` | `on` | `on`/`off` | Manual broker context inject/extract. `off` = [Experiment 1](../experiments/01-broken-broker-context.md). | `order fulfillment notification` |
 | `CARDINALITY_MODE` | `normal` | `normal`/`high` | `high` adds `order_id` as a metric label = [Experiment 2](../experiments/02-metric-cardinality.md). | `order` |
 
 > **Coupling:** `PREP_SECONDS` must stay well under the gateway's
-> `tail_sampling.decision_wait` (15s in [`collector/gateway.yaml`](../../collector/gateway.yaml)).
+> `tail_sampling.decision_wait` (15s in [`collector/gateway.yaml`](../../../collector/gateway.yaml)).
 > If you raise prep time near or past that, the sampler decides before async spans
 > arrive and persists incomplete traces.
 
@@ -98,15 +98,15 @@ Swapped by changing a collector's `command:` in `deploy/docker-compose.yml`
 
 | File | Used by | Purpose |
 |---|---|---|
-| [`collector/edge.yaml`](../../collector/edge.yaml) | `edge-collector` (default) | Healthy edge: memory_limiter + batch |
-| [`collector/edge.weak.yaml`](../../collector/edge.weak.yaml) | Experiment 3 | Undersized edge (backpressure) |
-| [`collector/gateway.yaml`](../../collector/gateway.yaml) | `gateway-collector` (default) | Tail sampling + scrub + fan-out |
-| [`collector/gateway.nosample.yaml`](../../collector/gateway.nosample.yaml) | Experiment 4 | Same, minus tail sampling |
+| [`collector/edge.yaml`](../../../collector/edge.yaml) | `edge-collector` (default) | Healthy edge: memory_limiter + batch |
+| [`collector/edge.weak.yaml`](../../../collector/edge.weak.yaml) | Experiment 3 | Undersized edge (backpressure) |
+| [`collector/gateway.yaml`](../../../collector/gateway.yaml) | `gateway-collector` (default) | Tail sampling + scrub + fan-out |
+| [`collector/gateway.nosample.yaml`](../../../collector/gateway.nosample.yaml) | Experiment 4 | Same, minus tail sampling |
 
 ### Service-level telemetry env
 
 Every service shares one `OTEL_*` block in
-[`deploy/docker-compose.yml`](../../deploy/docker-compose.yml) (the `x-otel-env`
+[`deploy/docker-compose.yml`](../../../deploy/docker-compose.yml) (the `x-otel-env`
 anchor). You normally do not change these — they are what makes all three pillars flow.
 Two of them are easy to lose and cause silent, partial breakage, so they are listed
 explicitly.
@@ -123,3 +123,10 @@ explicitly.
 
 > The SLO latency rule and panel use the custom `brewline_order_duration_seconds`
 > histogram, so they survive HTTP semantic-convention drift regardless of the opt-in.
+
+## Next
+
+- Day-to-day operation, monitoring, and incident procedures:
+  [OP-02 — Runbook](OP-02-runbook.md).
+- Prove the alerting path works: [OP-03 — SLO alert drill](OP-03-slo-alert-drill.md).
+- The four deliberate-failure labs: [Experiments](../experiments/index.md).

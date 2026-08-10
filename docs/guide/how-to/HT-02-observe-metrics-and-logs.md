@@ -1,4 +1,4 @@
-# How-to: Observe metrics and logs
+# HT-02 — Observe metrics and logs
 
 Goal: read Brewline's RED + business metrics in Grafana, and pivot from a log line to
 its trace.
@@ -10,6 +10,8 @@ generator so the dashboards have data:
 k6 run -e STOREFRONT_URL=http://localhost:8000 loadgen/k6_order.js
 ```
 
+**Time:** ~10 minutes. This page is read-only — it changes nothing.
+
 ## Open the dashboards
 
 Grafana is at **http://localhost:3000** (anonymous admin is enabled — no login). The
@@ -20,7 +22,7 @@ provisioned dashboards are in the **Brewline** folder:
 | Service overview (RED) | `/d/brewline-red` | Request rate, error rate, order latency p50/p95/p99 |
 | Order business metrics | `/d/brewline-orders` | Orders placed (paid vs failed), order value, payment failure rate, queue depth |
 | Logs explore | `/d/brewline-logs` | Brewline service logs with trace links |
-| SLO & error budget | `/d/brewline-slo` | Covered in [SLOs and burn-rate alerts](slos-and-alerts.md) |
+| SLO & error budget | `/d/brewline-slo` | Covered in [SLOs and burn-rate alerts](HT-03-slos-and-alerts.md) |
 
 **Verify:** open `/d/brewline-orders`; within a minute of load you see the "Orders
 placed" panel rising and a non-zero queue-depth series.
@@ -31,8 +33,9 @@ On **Order business metrics**:
 
 - **Orders placed (paid vs failed)** — `rate(brewline_orders_placed_total)` split by
   `outcome`. With default settings almost all are `paid`.
-- **Payment failure rate** — climbs only when you raise `PAYMENT_FAILURE_RATE` (see
-  [Experiment / alerts](slos-and-alerts.md)).
+- **Payment failure rate** — climbs only when you raise `PAYMENT_FAILURE_RATE`, which
+  is operator work: see
+  [OP-03 — SLO alert drill](../operations/OP-03-slo-alert-drill.md).
 - **Queue depth (RabbitMQ)** — `rabbitmq_queue_messages_ready` /
   `_unacked`. This comes from RabbitMQ's own Prometheus plugin, not a worker gauge.
 

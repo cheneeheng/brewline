@@ -14,7 +14,7 @@ You need:
 
 You do **not** need Python or Go installed locally — everything runs in containers.
 For deeper environment/version details see
-[Install and configure](operations/install-and-configure.md).
+[Install and configure](operations/OP-01-install-and-configure.md).
 
 ## 1. Create your environment file
 
@@ -57,23 +57,28 @@ curl -s localhost:8000/orders \
   -d '{"items":[{"sku":"LAT-001","name":"Latte","qty":1,"unit_price":"4.50"}]}'
 ```
 
-Expected output (a fresh UUID, status `paid`):
+Expected output (a fresh UUID, status `paid`, HTTP 202):
 
 ```
-{"order_id":"<uuid>","status":"paid"}
+{"order_id":"3f0a1c9e-7b4d-4a2e-9c31-2b8f5d6e0a11","status":"paid"}
 ```
 
 > Status `paid` means the synchronous half succeeded (charged + stock reserved) and
 > `order.placed` was published. The async workers then advance the order
 > `fulfilling → ready` over the next couple of seconds.
 
-**Verify:** fetch the order back and watch it reach `ready`:
+**Verify:** fetch the order back through the storefront and watch it reach `ready`.
+Substitute your own `order_id`:
 
 ```bash
-curl -s localhost:8001/orders/<uuid>
+curl -s localhost:8000/orders/3f0a1c9e-7b4d-4a2e-9c31-2b8f5d6e0a11
 ```
 
-After ~2 seconds (`PREP_SECONDS`), `status` becomes `ready`.
+After ~2 seconds (`PREP_SECONDS`), `status` reads `ready`:
+
+```
+{"order_id":"3f0a1c9e-7b4d-4a2e-9c31-2b8f5d6e0a11","status":"ready","total_amount":"4.50","items":[{"sku":"LAT-001","name":"Latte","qty":1,"unit_price":"4.50"}]}
+```
 
 ## 4. See the trace
 
@@ -109,13 +114,24 @@ which lights up the Grafana dashboards.
 ## Next steps
 
 - Understand what you just saw: [Concepts](concepts.md).
-- Explore the telemetry: [Observe traces](how-to/observe-traces.md),
-  [metrics and logs](how-to/observe-metrics-and-logs.md).
+- Explore the telemetry: [Observe traces](how-to/HT-01-observe-traces.md),
+  [metrics and logs](how-to/HT-02-observe-metrics-and-logs.md).
 - Break things on purpose: [Experiments](experiments/index.md).
 
 ## Stopping
 
+Stop and remove the containers, keeping the Postgres volume:
+
 ```bash
-docker compose -f deploy/docker-compose.yml down        # keep data
-docker compose -f deploy/docker-compose.yml down -v     # also wipe Postgres volume
+docker compose -f deploy/docker-compose.yml down
+```
+
+**Verify:** `docker compose -f deploy/docker-compose.yml ps` lists nothing.
+
+> **Warning:** the `-v` form below also deletes the `pgdata` volume — every order,
+> order item, and inventory row is lost. Recovery is a re-run of `up --build`, which
+> replays the migrations and reseeds the eight SKUs. There is no backup.
+
+```bash
+docker compose -f deploy/docker-compose.yml down -v     # also wipe Postgres data
 ```

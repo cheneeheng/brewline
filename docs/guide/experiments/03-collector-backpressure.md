@@ -4,20 +4,25 @@
 `memory_limiter` and `batch` correctly is what keeps it from dropping your telemetry
 under load.
 
-**Time:** ~10 minutes. **Reversible:** yes.
+**Prerequisites:** a running stack ([Getting started](../getting-started.md)); k6 to
+drive the spike; write access to `deploy/docker-compose.yml`; permission to recreate
+containers.
+**Time / impact:** ~10 minutes. No application downtime, but this lab **deliberately
+destroys telemetry** — spans dropped during the spike are gone for good. Orders
+themselves are unaffected. Reverting the config restores the pipeline.
 
 ## Background
 
-The healthy edge config ([`collector/edge.yaml`](../../collector/edge.yaml)) has a
+The healthy edge config ([`collector/edge.yaml`](../../../collector/edge.yaml)) has a
 reasonable `memory_limiter` and a `batch` processor. The weak variant
-([`collector/edge.weak.yaml`](../../collector/edge.weak.yaml)) deliberately uses a
+([`collector/edge.weak.yaml`](../../../collector/edge.weak.yaml)) deliberately uses a
 tiny memory limit and **no batching** — so under a load spike it refuses and drops
 data. Both files are already mounted into the `edge-collector` container; you switch by
 pointing its `command:` at the weak file.
 
 ## Induce the failure
 
-1. In [`deploy/docker-compose.yml`](../../deploy/docker-compose.yml), find the
+1. In [`deploy/docker-compose.yml`](../../../deploy/docker-compose.yml), find the
    `edge-collector` service and change its command to the weak config:
    ```yaml
        command: ["--config=/etc/otelcol/edge.weak.yaml"]

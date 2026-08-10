@@ -64,20 +64,42 @@ machine — plus the decision trail behind the design, see
 
 ## Contents
 
-- **[Getting started](getting-started.md)** — from an empty checkout to your first
-  trace in Jaeger.
-- **[Concepts](concepts.md)** — the OpenTelemetry ideas this rig demonstrates and
-  where each one lives in the code.
-- **How-to**
-  - [Observe traces](how-to/observe-traces.md)
-  - [Observe metrics and logs](how-to/observe-metrics-and-logs.md)
-  - [SLOs and burn-rate alerts](how-to/slos-and-alerts.md)
-- **[Experiments](experiments/index.md)** — four deliberate-failure labs (the heart
-  of the rig).
-- **Operations**
-  - [Install and configure](operations/install-and-configure.md)
-  - [Runbook](operations/runbook.md)
-- **[Troubleshooting](troubleshooting.md)**
+### Learning path (user)
+
+You need only a browser, `curl`, and a stack someone has started.
+
+1. **[Getting started](getting-started.md)** — from an empty checkout to your first
+   trace in Jaeger.
+2. **[Concepts](concepts.md)** — the OpenTelemetry ideas this rig demonstrates and
+   where each one lives in the code.
+3. **How-to** — one task per page, in the order they build on each other:
+   1. [HT-01 — Observe traces](how-to/HT-01-observe-traces.md)
+   2. [HT-02 — Observe metrics and logs](how-to/HT-02-observe-metrics-and-logs.md)
+   3. [HT-03 — SLOs and burn-rate alerts](how-to/HT-03-slos-and-alerts.md)
+4. **[Troubleshooting](troubleshooting.md)** — symptom → cause → fix for common
+   stumbles.
+
+### Operating path (operator)
+
+These pages assume shell access to the repo, permission to edit `.env` and
+`deploy/docker-compose.yml`, and permission to recreate containers. Read them in
+order:
+
+1. **[OP-01 — Install and configure](operations/OP-01-install-and-configure.md)** —
+   requirements, install, every tunable setting.
+2. **[OP-02 — Runbook](operations/OP-02-runbook.md)** — routine operations,
+   monitoring, incident procedures, recovery.
+3. **[OP-03 — SLO alert drill](operations/OP-03-slo-alert-drill.md)** — force the
+   burn-rate alert to fire, then clear it.
+4. **[Experiments](experiments/index.md)** — four deliberate-failure labs, numbered
+   01 to 04 (the heart of the rig). They change configuration, so they are operator
+   work.
+
+File names carry their reading order: `HT-nn-` for user how-to pages, `OP-nn-` for
+operator pages, `nn-` for experiments.
+
+User pages never ask you to run a privileged command; when a task needs one, the page
+links to the operator page that owns it.
 
 ## Service and port map
 

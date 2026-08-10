@@ -4,13 +4,17 @@
 interesting trace (errors, slow ones) while shedding the boring majority — and you can
 measure exactly how much it saves.
 
-**Time:** ~15 minutes (two timed runs). **Reversible:** yes.
+**Prerequisites:** a running stack ([Getting started](../getting-started.md)); k6 to
+drive two identical 5-minute runs; write access to `deploy/docker-compose.yml`;
+permission to recreate containers.
+**Time / impact:** ~15 minutes (two timed runs). No downtime. Fully reversible —
+running without sampling only raises export volume.
 
 ## Background
 
-The default gateway ([`collector/gateway.yaml`](../../collector/gateway.yaml)) applies
+The default gateway ([`collector/gateway.yaml`](../../../collector/gateway.yaml)) applies
 **tail sampling**: keep 100% of error/slow traces + 5% of the rest. The variant
-([`collector/gateway.nosample.yaml`](../../collector/gateway.nosample.yaml)) removes
+([`collector/gateway.nosample.yaml`](../../../collector/gateway.nosample.yaml)) removes
 the `tail_sampling` processor so every trace is exported. You compare the gateway's own
 exported-span counter across the two runs.
 
@@ -21,7 +25,7 @@ exported-span counter across the two runs.
 ## Run A — sampling ON (baseline)
 
 1. Ensure the gateway uses the default config (the `command:` for `gateway-collector`
-   in [`deploy/docker-compose.yml`](../../deploy/docker-compose.yml) points at
+   in [`deploy/docker-compose.yml`](../../../deploy/docker-compose.yml) points at
    `gateway.yaml`). If you changed it before, set it back and recreate:
    ```bash
    docker compose -f deploy/docker-compose.yml up -d --force-recreate gateway-collector

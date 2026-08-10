@@ -3,7 +3,10 @@
 **Teaches:** how trace context is carried across a non-HTTP boundary (a message
 broker), and what a fragmented trace looks like.
 
-**Time:** ~5 minutes. **Reversible:** yes.
+**Prerequisites:** a running stack ([Getting started](../getting-started.md)); write
+access to `.env`; permission to recreate containers.
+**Time / impact:** ~5 minutes. No downtime; recreating the three services drops
+in-flight requests. Fully reversible — the flag changes instrumentation only.
 
 ## Background
 

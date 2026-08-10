@@ -104,3 +104,28 @@ both are documented in README "Notes & boundaries". Neither was verified against
 
 **Outcome:** Applied to `deploy/docker-compose.yml` and `README.md`; also added the hand-set pgx /
 go-redis span attributes ITER_01 §03 calls for to `services/inventory/main.go`.
+
+### Entry 5
+
+**Type:** Decision
+**Mode:** Autonomous
+**Timestamp:** 2026-08-10T00:00:00Z
+**Task:** Restructure docs/guide to the user-operator-guide skill structure.
+
+**Context:** The skill forbids interleaving end-user steps with privileged operator
+commands. The existing `how-to/slos-and-alerts.md` was a user page that also told the
+reader to edit `.env` and recreate the payment container. Two resolutions were
+possible: keep the drill in the how-to behind a warning, or split it into the
+operator subtree.
+
+**Decision:** Split it. `HT-03` is now read-only (what the SLOs measure, how the alert
+threshold is built, how to check alert state); the config-changing drill moved to a new
+`operations/OP-03-slo-alert-drill.md`. This keeps the index's promise that user pages
+never ask for a privileged command, and it fits the `HT-`/`OP-` numbering the user
+requested mid-task.
+
+**Impact / Risk:** One extra operator page. Anyone with a bookmark to the old
+`how-to/slos-and-alerts.md` path gets a 404 — all in-repo links were updated and
+verified.
+
+**Outcome:** All 5 guide subtree links resolve; no broken links repo-wide.

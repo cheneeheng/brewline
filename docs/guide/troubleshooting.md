@@ -2,7 +2,7 @@
 
 Symptom → cause → fix for common stumbles. For deliberate failures you induced, see
 the [Experiments](experiments/index.md); for operational incidents see the
-[Runbook](operations/runbook.md).
+[Runbook](operations/OP-02-runbook.md).
 
 ## Stack won't start
 

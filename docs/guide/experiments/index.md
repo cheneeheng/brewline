@@ -26,7 +26,7 @@ swaps) go deeper into the pipeline.
   services with `docker compose ... up -d --force-recreate <service>`.
 - **Collector config swaps** (labs 3 and 4): the alternate config files are already
   mounted into the collector containers. You point the container's `command:` at the
-  alternate file in [`deploy/docker-compose.yml`](../../deploy/docker-compose.yml),
+  alternate file in [`deploy/docker-compose.yml`](../../../deploy/docker-compose.yml),
   then recreate that one collector.
 
 Always **revert** at the end of a lab so later labs start from a healthy baseline.
