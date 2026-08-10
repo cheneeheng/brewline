@@ -24,11 +24,13 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var (
 	db            *pgxpool.Pool
 	rdb           *redis.Client
+	tracer        = otel.Tracer("brewline.inventory")
 	reserveCount  metric.Int64Counter
 	shortageCount metric.Int64Counter
 	cacheTTL      = 30 * time.Second
@@ -110,10 +112,26 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 func cacheKey(sku string) string { return "inv:" + sku }
 
 // availableQty returns available_qty, cache-first.
+//
+// pgx and go-redis have no auto-instrumentation here, so the datastore hops carry
+// hand-set span attributes (ITER_01 §03) — otherwise a cache hit and a Postgres
+// read look identical in the waterfall.
 func availableQty(ctx context.Context, sku string) (int, bool, error) {
+	ctx, span := tracer.Start(ctx, "inventory.available_qty")
+	defer span.End()
+	span.SetAttributes(attribute.String("brewline.sku", sku))
+
 	if v, err := rdb.Get(ctx, cacheKey(sku)).Int(); err == nil {
+		span.SetAttributes(
+			attribute.String("db.system", "redis"),
+			attribute.Bool("brewline.cache_hit", true),
+		)
 		return v, true, nil
 	}
+	span.SetAttributes(
+		attribute.String("db.system", "postgresql"),
+		attribute.Bool("brewline.cache_hit", false),
+	)
 	var avail int
 	err := db.QueryRow(ctx,
 		"SELECT available_qty FROM inventory_items WHERE sku=$1", sku).Scan(&avail)
@@ -121,6 +139,7 @@ func availableQty(ctx context.Context, sku string) (int, bool, error) {
 		return 0, false, nil
 	}
 	if err != nil {
+		span.RecordError(err)
 		return 0, false, err
 	}
 	rdb.Set(ctx, cacheKey(sku), avail, cacheTTL) // back-fill cache
@@ -134,6 +153,16 @@ func reserveHandler(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad request"})
 		return
 	}
+
+	// High-cardinality identifiers belong on spans, never on metric labels
+	// (ITER_03 cardinality discipline); order_id is what makes a reservation
+	// findable from the Loki log line.
+	span := trace.SpanFromContext(ctx)
+	span.SetAttributes(
+		attribute.String("brewline.order_id", req.OrderID),
+		attribute.Int("brewline.item_count", len(req.Items)),
+		attribute.String("db.system", "postgresql"),
+	)
 
 	tx, err := db.Begin(ctx)
 	if err != nil {
