@@ -129,3 +129,32 @@ requested mid-task.
 verified.
 
 **Outcome:** All 5 guide subtree links resolve; no broken links repo-wide.
+
+### Entry 6
+
+**Type:** Decision
+**Mode:** Autonomous
+**Timestamp:** 2026-08-11T22:45:00Z
+**Task:** Audit docs/guide against user-operator-guide skill v1.1.6 and close the gaps.
+
+**Context:** `CLAUDE.md` (written in the previous session) claimed the guide enforces a hard
+split in which the user pages "never contain a privileged command". That is not true of the
+tree as it stands: `getting-started.md` runs `cp .env.example .env`, `docker compose up --build`
+and `down -v`, and `troubleshooting.md` names one-line fixes such as "lower it in `.env`,
+recreate `payment`". Two resolutions were possible: move those commands into the operator
+subtree to make the claim true, or correct the claim.
+
+**Decision:** Corrected the claim. The skill's own Getting Started spine is
+"install → configure → run the smallest real task", so a getting-started page without the
+install commands cannot get anyone started, and a troubleshooting table that only links out is
+worse to use on a bad day. The `CLAUDE.md` repo-layout bullet now states the real rule: every
+multi-step operator procedure lives under `operations/OP-nn-*` or `experiments/EX-nn-*`, the
+`HT-nn-*` pages are read-only, and getting-started/troubleshooting carry only the commands their
+own job needs.
+
+**Impact / Risk:** Documentation-only. The audience split the guide actually implements is
+unchanged; only its description is now accurate. Risk is that a future agent reads the looser
+wording as licence to put operator procedures on user pages — the bullet names the boundary
+explicitly to limit that.
+
+**Outcome:** `CLAUDE.md` repo-layout bullet updated. Guide structure left as-is.
