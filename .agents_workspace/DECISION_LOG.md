@@ -158,3 +158,66 @@ wording as licence to put operator procedures on user pages — the bullet names
 explicitly to limit that.
 
 **Outcome:** `CLAUDE.md` repo-layout bullet updated. Guide structure left as-is.
+
+### Entry 7
+
+**Type:** Decision
+**Mode:** Autonomous
+**Timestamp:** 2026-08-11T23:20:00Z
+**Task:** Create examples that showcase the project.
+
+**Context:** "Examples" was open-ended. Three readings were plausible: more prose pages under
+`docs/guide/`, a set of example request payloads, or runnable scripts. The guide already
+explains every flow in prose and the README already carries the one-line `curl`, so a fourth
+prose surface would duplicate rather than showcase. What was missing was a way to *see* the
+payoff — the connected trace, the translated metric names, the correlated logs — without first
+learning three UIs.
+
+**Decision:** Added `examples/`: five bash scripts plus `_lib.sh` that drive the stack over its
+public HTTP surface and then read the telemetry back out of the Jaeger, Prometheus, and Loki
+APIs, rendering it in the terminal (including a text waterfall for one order trace). Each script
+generates its own W3C trace ID and sends it as `traceparent`, so the trace is fetched by ID
+rather than hunted for in the UI. Kept them strictly read-only: no script edits `.env`, swaps a
+collector config, or recreates a container — deliberate-failure demos stay in
+`docs/guide/experiments/`, which is where the rig's structure already puts reversible
+config-changing procedures. The only failure showcased is the stock shortage, which needs
+nothing but an oversized request.
+
+**Impact / Risk:** Additive; one pointer added to `README.md`. `docs/guide/` untouched, so its
+numbering and prev/next rules are unaffected. Risk: the scripts were syntax-checked and their jq
+programs were verified against fixtures, but never run against a live stack — the API shapes
+(Jaeger `/api/traces/<id>`, Prometheus `/api/v1/query`, Loki `query_range`) are assumed from the
+configs and dashboards, not observed. Loki structured metadata is the softest assumption; script
+05 degrades with an explanation instead of failing if the `trace_id` is absent from the API
+response.
+
+**Outcome:** `examples/` added with README; `bash -n` clean on all six files.
+
+### Entry 8
+
+**Type:** Decision
+**Mode:** Autonomous
+**Timestamp:** 2026-08-11T23:45:00Z
+**Task:** Add PowerShell versions of the example scripts (user request, Windows host).
+
+**Context:** The bash examples already run on the host via Git Bash, so the ports are a
+convenience, not a fix. Two sub-decisions had no obvious answer: where to put them, and how
+faithful to keep them.
+
+**Decision:** Ported flat alongside the bash files (`01-place-an-order.ps1` next to
+`.sh`) rather than into an `examples/powershell/` subtree, so the numbering stays one
+sequence and the README stays one table. Kept the narration text identical line for line, so
+the two sets can be diffed when either changes. Required PowerShell 7 (`#requires -Version
+7.0`): `Invoke-RestMethod` removes the `curl`/`jq`/`od` dependencies outright, `??` and the
+`[guid]::NewGuid().ToString('N')` trace ID keep the helpers to a few lines, and 5.1 would
+need workarounds for all three.
+
+**Impact / Risk:** Testing surfaced a genuine defect: this host formats decimals with a
+comma, so `[math]::Round()` printed `0,142` where jq prints `0.142`. Numeric and time output
+is now forced through `InvariantCulture` — do not "simplify" those casts away, they are the
+fix. One accepted divergence remains: script 05 prints log timestamps in local time under
+PowerShell and UTC under bash, because `[DateTimeOffset]` makes local time the cheap default
+and jq's `strftime` makes UTC the cheap default. Both scripts label which they show.
+
+**Outcome:** Six `.ps1` files added; all parse-clean, error paths exercised with the stack
+down, waterfall renderer verified byte-identical to the bash output against a fixture.

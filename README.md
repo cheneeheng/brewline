@@ -49,6 +49,22 @@ curl -s localhost:8000/orders -H 'content-type: application/json' \
   -d '{"items":[{"sku":"LAT-001","name":"Latte","qty":1,"unit_price":"4.50"}]}'
 ```
 
+### Examples
+
+[`examples/`](examples/) holds five scripts that drive the stack and print the
+telemetry back in the terminal — the order lifecycle, a full trace waterfall across
+HTTP *and* the broker, the metrics as Prometheus stores them, the shortage failure
+path, and the log→trace pivot. They change no configuration. Each one comes as
+`bash` (needs `curl` + `jq`) and PowerShell 7 (needs nothing else):
+
+```bash
+cd examples && bash 02-follow-one-trace.sh
+```
+
+```powershell
+cd examples; ./02-follow-one-trace.ps1
+```
+
 ### UIs
 
 | UI | URL |
