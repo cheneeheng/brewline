@@ -1,16 +1,20 @@
 # HT-03 — SLOs and burn-rate alerts
 
+[← Guide index](../index.md)
+
 Goal: read Brewline's two SLOs and know exactly when the burn-rate alert fires.
 
-**Prerequisites:** the stack is running with traffic flowing. Steady load helps the
-numbers move:
+- **Prerequisites:** the stack is running with traffic flowing (see the load generator
+  command below).
+- **Time:** ~5 minutes.
+- **Impact:** none. This page is read-only — it changes nothing. To force the alert to
+  fire, see [OP-03 — SLO alert drill](../operations/OP-03-slo-alert-drill.md).
+
+Steady load helps the numbers move:
 
 ```bash
 k6 run -e STOREFRONT_URL=http://localhost:8000 loadgen/k6_order.js
 ```
-
-**Time:** ~5 minutes. This page is read-only — it changes nothing. To force the alert
-to fire, see [OP-03 — SLO alert drill](../operations/OP-03-slo-alert-drill.md).
 
 ## The two SLOs
 
@@ -81,3 +85,7 @@ alerts** table is empty.
 
 There is intentionally **no Alertmanager**. The alert is viewed in Prometheus and
 Grafana only; paging integrations are out of scope for this rig.
+
+---
+
+[← HT-02 Observe metrics and logs](HT-02-observe-metrics-and-logs.md) · [Guide index](../index.md)

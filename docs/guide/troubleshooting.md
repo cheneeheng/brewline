@@ -1,8 +1,10 @@
 # Troubleshooting
 
-Symptom → cause → fix for common stumbles. For deliberate failures you induced, see
-the [Experiments](experiments/index.md); for operational incidents see the
-[Runbook](operations/OP-02-runbook.md).
+[← Guide index](index.md)
+
+Symptom → cause → fix for common stumbles. For deliberate failures you induced, see the
+experiments listed on the [Guide index](index.md#experiments--deliberate-failure-labs-operator);
+for operational incidents see the [Runbook](operations/OP-02-runbook.md).
 
 ## Stack won't start
 
@@ -16,18 +18,21 @@ the [Experiments](experiments/index.md); for operational incidents see the
 ## No traces in Jaeger
 
 1. Confirm Jaeger is up: open http://localhost:16686.
+
 2. Confirm the collectors are healthy:
+
    ```bash
    docker compose -f deploy/docker-compose.yml logs gateway-collector | tail
    ```
+
 3. Confirm services export to the edge collector (the `OTEL_EXPORTER_OTLP_ENDPOINT`
    env is `http://edge-collector:4317`).
 
 | Symptom | Cause | Fix |
 |---|---|---|
 | No traces at all | Collector down or misconfigured | Check `edge-collector` / `gateway-collector` logs for config errors |
-| Traces appear, then stop under load | Edge collector dropping spans | You may be on `edge.weak.yaml`; see [Experiment 3](experiments/03-collector-backpressure.md) |
-| Async spans never join | Broker propagation off | Set `BROKER_PROPAGATION=on`; see [Experiment 1](experiments/01-broken-broker-context.md) |
+| Traces appear, then stop under load | Edge collector dropping spans | You may be on `edge.weak.yaml`; see [EX-03](experiments/EX-03-collector-backpressure.md) |
+| Async spans never join | Broker propagation off | Set `BROKER_PROPAGATION=on`; see [EX-01](experiments/EX-01-broken-broker-context.md) |
 | Few traces under steady load | Expected — tail sampling keeps 5% of normal traces | Search by `error=true` or longest-duration; those are always kept |
 
 ## Grafana panels empty

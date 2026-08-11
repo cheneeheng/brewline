@@ -1,5 +1,7 @@
 # Getting started
 
+[← Guide index](index.md)
+
 Goal: from a fresh checkout to seeing your **first distributed trace** in Jaeger.
 
 **Time:** ~10 minutes (most of it the first image build).
@@ -96,10 +98,11 @@ That single connected waterfall across HTTP *and* the broker is the whole point 
 Brewline.
 
 **If it fails:**
+
 - Only storefront/order spans appear, async ones missing → wait a few seconds and
   refresh; the prep delay means async spans arrive late. If they never join, check
-  [Experiment 1](experiments/01-broken-broker-context.md) symptoms and confirm
-  `BROKER_PROPAGATION=on`.
+  [EX-01 — Broken trace context at the broker](experiments/EX-01-broken-broker-context.md)
+  symptoms and confirm `BROKER_PROPAGATION=on`.
 - No traces at all → see [Troubleshooting](troubleshooting.md).
 
 ## 5. Drive continuous traffic (optional)
@@ -111,12 +114,18 @@ k6 run -e STOREFRONT_URL=http://localhost:8000 loadgen/k6_order.js
 This runs the steady `constant-arrival-rate` scenario (~10 orders/s for 5 minutes),
 which lights up the Grafana dashboards.
 
+**Verify:** the k6 end-of-test summary reports the `order accepted (202)` check at or
+near 100%, and the Grafana dashboard **Order business metrics**
+(http://localhost:3000, `/d/brewline-orders`) shows a rising order rate within about
+30 seconds of the run starting.
+
 ## Next steps
 
 - Understand what you just saw: [Concepts](concepts.md).
 - Explore the telemetry: [Observe traces](how-to/HT-01-observe-traces.md),
   [metrics and logs](how-to/HT-02-observe-metrics-and-logs.md).
-- Break things on purpose: [Experiments](experiments/index.md).
+- Break things on purpose: the four experiments, starting with
+  [EX-01 — Broken trace context at the broker](experiments/EX-01-broken-broker-context.md).
 
 ## Stopping
 

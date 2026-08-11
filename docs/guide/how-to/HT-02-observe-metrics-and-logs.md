@@ -1,16 +1,20 @@
 # HT-02 — Observe metrics and logs
 
+[← Guide index](../index.md)
+
 Goal: read Brewline's RED + business metrics in Grafana, and pivot from a log line to
 its trace.
 
-**Prerequisites:** the stack is running with traffic flowing. Start the steady load
-generator so the dashboards have data:
+- **Prerequisites:** the stack is running with traffic flowing (see the load generator
+  command below).
+- **Time:** ~10 minutes.
+- **Impact:** none. This page is read-only — it changes nothing.
+
+Start the steady load generator so the dashboards have data:
 
 ```bash
 k6 run -e STOREFRONT_URL=http://localhost:8000 loadgen/k6_order.js
 ```
-
-**Time:** ~10 minutes. This page is read-only — it changes nothing.
 
 ## Open the dashboards
 
@@ -47,9 +51,11 @@ On **Order business metrics**:
 
 1. Open **http://localhost:9090**.
 2. In the expression box, run:
+
    ```
    sum by (outcome) (rate(brewline_orders_placed_total[5m]))
    ```
+
 3. Click **Execute**, then the **Graph** tab.
 
 **Verify:** one line per `outcome` value.
@@ -75,3 +81,7 @@ stamped on both.
 | Dashboards empty | No traffic yet, or scrape not ready | Run k6; wait ~30s for the first scrape |
 | Loki panel empty but traces work | Log records enriched but never shipped | Confirm **both** `OTEL_LOGS_EXPORTER=otlp` and `OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true`; see [Troubleshooting](../troubleshooting.md) |
 | RED rate/error panels say "No data" | HTTP metric series name differs from the query | Confirm `OTEL_SEMCONV_STABILITY_OPT_IN=http`; the panels query `http_server_request_duration_seconds_*`. See [Troubleshooting](../troubleshooting.md). The order-latency panel uses the custom `brewline_order_duration_seconds` histogram and is unaffected |
+
+---
+
+[← HT-01 Observe traces](HT-01-observe-traces.md) · [Guide index](../index.md) · [HT-03 SLOs and burn-rate alerts →](HT-03-slos-and-alerts.md)

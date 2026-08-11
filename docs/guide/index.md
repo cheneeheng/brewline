@@ -8,8 +8,8 @@ and failure modes you get when you actually run a distributed system.
 
 You are both the **user** (you place orders and explore the telemetry to learn) and
 the **operator** (you stand the stack up and run the experiments). This guide keeps
-those hats separate: learning tasks live in *Getting started*, *Concepts*, *How-to*,
-and *Experiments*; running-the-system tasks live under *Operations*.
+those hats separate: learning tasks live in *Getting started*, *Concepts*, and
+*How-to*; running-the-system tasks live under *Operations* and *Experiments*.
 
 ## What this rig teaches
 
@@ -30,9 +30,8 @@ part you can see, break, and fix:
 - **SLOs and burn-rate alerting** — latency and payment-success SLOs with a
   multi-window burn-rate alert.
 
-The deepest learning is in the four **[Experiments](experiments/index.md)**: each one
-has you toggle a flag, break the telemetry on purpose, observe the symptom in a real
-UI, and fix it.
+The deepest learning is in the four **experiments**: each one has you toggle a flag,
+break the telemetry on purpose, observe the symptom in a real UI, and fix it.
 
 ## Architecture
 
@@ -64,42 +63,67 @@ machine — plus the decision trail behind the design, see
 
 ## Contents
 
-### Learning path (user)
+### Start here
 
-You need only a browser, `curl`, and a stack someone has started.
+| Page | Read this when |
+|---|---|
+| [Getting started](getting-started.md) | You have an empty checkout and want your first trace in Jaeger. |
+| [Concepts](concepts.md) | You have seen a trace and want to know what you were looking at. |
+| [Troubleshooting](troubleshooting.md) | Something is empty, missing, or failing and you did not do it on purpose. |
 
-1. **[Getting started](getting-started.md)** — from an empty checkout to your first
-   trace in Jaeger.
-2. **[Concepts](concepts.md)** — the OpenTelemetry ideas this rig demonstrates and
-   where each one lives in the code.
-3. **How-to** — one task per page, in the order they build on each other:
-   1. [HT-01 — Observe traces](how-to/HT-01-observe-traces.md)
-   2. [HT-02 — Observe metrics and logs](how-to/HT-02-observe-metrics-and-logs.md)
-   3. [HT-03 — SLOs and burn-rate alerts](how-to/HT-03-slos-and-alerts.md)
-4. **[Troubleshooting](troubleshooting.md)** — symptom → cause → fix for common
-   stumbles.
+### How-to — learning tasks (user)
 
-### Operating path (operator)
+You need only a browser, `curl`, and a stack someone has started. These pages are
+read-only: none of them asks you to change configuration.
+
+| Page | Read this when |
+|---|---|
+| [HT-01 — Observe traces](how-to/HT-01-observe-traces.md) | You want to read an order waterfall in Jaeger and recognize every hop. |
+| [HT-02 — Observe metrics and logs](how-to/HT-02-observe-metrics-and-logs.md) | You want the Grafana dashboards, and the log→trace pivot. |
+| [HT-03 — SLOs and burn-rate alerts](how-to/HT-03-slos-and-alerts.md) | You want to know what the two SLOs measure and exactly when the alert fires. |
+
+### Operations — running the system (operator)
 
 These pages assume shell access to the repo, permission to edit `.env` and
-`deploy/docker-compose.yml`, and permission to recreate containers. Read them in
-order:
+`deploy/docker-compose.yml`, and permission to recreate containers.
 
-1. **[OP-01 — Install and configure](operations/OP-01-install-and-configure.md)** —
-   requirements, install, every tunable setting.
-2. **[OP-02 — Runbook](operations/OP-02-runbook.md)** — routine operations,
-   monitoring, incident procedures, recovery.
-3. **[OP-03 — SLO alert drill](operations/OP-03-slo-alert-drill.md)** — force the
-   burn-rate alert to fire, then clear it.
-4. **[Experiments](experiments/index.md)** — four deliberate-failure labs, numbered
-   01 to 04 (the heart of the rig). They change configuration, so they are operator
-   work.
+| Page | Read this when |
+|---|---|
+| [OP-01 — Install and configure](operations/OP-01-install-and-configure.md) | You are standing the stack up, or you need the meaning and range of a setting. |
+| [OP-02 — Runbook](operations/OP-02-runbook.md) | You are starting, stopping, monitoring, or recovering the stack. |
+| [OP-03 — SLO alert drill](operations/OP-03-slo-alert-drill.md) | You want to prove the alerting path works before trusting it. |
 
-File names carry their reading order: `HT-nn-` for user how-to pages, `OP-nn-` for
-operator pages, `nn-` for experiments.
+### Experiments — deliberate-failure labs (operator)
 
-User pages never ask you to run a privileged command; when a task needs one, the page
-links to the operator page that owns it.
+The heart of the rig. Each lab follows the same loop:
+
+> **set a flag → drive load → observe the symptom in a real UI → revert the fix**
+
+Each lab is independently runnable and fully reversible. Run them in any order, but
+EX-01 and EX-02 (environment-flag toggles) are the gentlest starting point; EX-03 and
+EX-04 (collector config swaps) go deeper into the pipeline. Always revert at the end of
+a lab so the next one starts from a healthy baseline.
+
+| Page | Toggle | Read this when |
+|---|---|---|
+| [EX-01 — Broken trace context at the broker](experiments/EX-01-broken-broker-context.md) | `BROKER_PROPAGATION` | You want to see context propagation fail across a non-HTTP boundary. |
+| [EX-02 — Metric cardinality explosion](experiments/EX-02-metric-cardinality.md) | `CARDINALITY_MODE` | You want to watch one careless label grow a Prometheus without bound. |
+| [EX-03 — Collector backpressure](experiments/EX-03-collector-backpressure.md) | `edge.weak.yaml` | You want to see the collector become the choke point under a spike. |
+| [EX-04 — Sampling and cost](experiments/EX-04-sampling-and-cost.md) | `gateway.nosample.yaml` | You want to measure what tail sampling actually saves. |
+
+The two toggle mechanisms are documented once, in
+[OP-01 — Install and configure](operations/OP-01-install-and-configure.md): environment
+flags under *Behavior / experiment knobs*, and collector config swaps under *Collector
+configs*.
+
+## Naming and reading order
+
+File names carry their reading order. Pages at the root of this guide are unnumbered
+and can be read in any order. Every page inside a subfolder is
+`<PREFIX>-<NN>-<name>.md`, where the prefix names the subfolder (`HT` = how-to,
+`OP` = operations, `EX` = experiments) and `NN` is the order to read them in. Each
+subfolder is its own chain, so `HT-01` and `OP-01` are unrelated; the prev/next links
+at the foot of each page stay inside one subfolder.
 
 ## Service and port map
 

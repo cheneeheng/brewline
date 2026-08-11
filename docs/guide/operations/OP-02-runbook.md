@@ -1,5 +1,7 @@
 # OP-02 — Runbook
 
+[← Guide index](../index.md)
+
 Terse operator procedures for running Brewline locally. Commands assume you run them
 from the repo root. All use the project compose file:
 `docker compose -f deploy/docker-compose.yml`.
@@ -121,18 +123,23 @@ non-destructive unless the block says otherwise.
 
 ### Order trace fragments (async spans missing)
 
-**When:** a storefront trace ends at the `order.placed publish` span, and
-`fulfillment.process` appears as a separate root trace in Jaeger.
-**Time / impact:** ~2 minutes. Recreating the three services drops in-flight requests.
+- **When:** a storefront trace ends at the `order.placed publish` span, and
+  `fulfillment.process` appears as a separate root trace in Jaeger.
+- **Time / impact:** ~2 minutes. Recreating the three services drops in-flight
+  requests.
 
 1. Read the flag that controls manual broker propagation:
+
    ```bash
    docker compose -f deploy/docker-compose.yml exec order printenv BROKER_PROPAGATION
    ```
+
    If it prints `off`, that is the cause
-   ([Experiment 1](../experiments/01-broken-broker-context.md)).
+   ([EX-01](../experiments/EX-01-broken-broker-context.md)).
 2. Set `BROKER_PROPAGATION=on` in `.env`.
+
 3. Recreate every service that publishes or consumes on the broker:
+
    ```bash
    docker compose -f deploy/docker-compose.yml up -d --force-recreate order fulfillment notification
    ```
@@ -147,21 +154,28 @@ same fragmentation at a different hop
 
 ### Prometheus series count climbing without bound
 
-**When:** `prometheus_tsdb_head_series` rises continuously instead of holding flat.
-**Time / impact:** ~2 minutes. Recreating `order` drops in-flight orders.
+- **When:** `prometheus_tsdb_head_series` rises continuously instead of holding flat.
+- **Time / impact:** ~2 minutes. Recreating `order` drops in-flight orders.
 
 1. In Prometheus (**http://localhost:9090**), confirm the shape of the growth:
+
    ```
    prometheus_tsdb_head_series
    ```
+
 2. Identify the offending metric:
+
    ```
    count by (__name__) ({__name__=~"brewline_orders_placed_total|brewline_order_value_count"})
    ```
+
    A count that tracks the number of orders placed means `order_id` has become a label
-   ([Experiment 2](../experiments/02-metric-cardinality.md)).
+   ([EX-02](../experiments/EX-02-metric-cardinality.md)).
+
 3. Set `CARDINALITY_MODE=normal` in `.env`.
+
 4. Recreate the order service:
+
    ```bash
    docker compose -f deploy/docker-compose.yml up -d --force-recreate order
    ```
@@ -171,30 +185,39 @@ flattens. Existing series age out of the head block on their own; nothing to cle
 
 ### Telemetry dropped under load
 
-**When:** `rate(otelcol_processor_refused_spans[1m]) > 0`, or traces have gaps in
-Jaeger during a load spike.
-**Time / impact:** ~2 minutes. Recreating the edge collector loses whatever it is
-currently buffering.
+- **When:** `rate(otelcol_processor_refused_spans[1m]) > 0`, or traces have gaps in
+  Jaeger during a load spike.
+- **Time / impact:** ~2 minutes. Recreating the edge collector loses whatever it is
+  currently buffering.
 
 1. In Prometheus, confirm the drop is at the collector:
+
    ```
    rate(otelcol_processor_refused_spans[1m])
    rate(otelcol_exporter_send_failed_spans[1m])
    ```
+
 2. Check which config the running edge collector actually loaded:
+
    ```bash
    docker inspect --format '{{json .Config.Cmd}}' \
      $(docker compose -f deploy/docker-compose.yml ps -q edge-collector)
    ```
+
    Expected output on a healthy stack:
+
    ```
    ["--config=/etc/otelcol/edge.yaml"]
    ```
+
    `edge.weak.yaml` instead means the weak config is live — a 20 MiB memory limit and
-   no batch processor ([Experiment 3](../experiments/03-collector-backpressure.md)).
+   no batch processor ([EX-03](../experiments/EX-03-collector-backpressure.md)).
+
 3. Restore `command: ["--config=/etc/otelcol/edge.yaml"]` for `edge-collector` in
    `deploy/docker-compose.yml`.
+
 4. Recreate the collector:
+
    ```bash
    docker compose -f deploy/docker-compose.yml up -d --force-recreate edge-collector
    ```
@@ -208,18 +231,21 @@ genuinely undersized for the offered load. Raise `memory_limiter.limit_mib` in
 
 ### Messages stuck or dead-lettered
 
-**When:** the `brewline.dlq` queue has depth > 0 in the RabbitMQ UI
-(**http://localhost:15672**, login `brewline` / `brewline`).
-**Time / impact:** diagnosis is read-only. The optional purge in step 4 is
-irreversible.
+- **When:** the `brewline.dlq` queue has depth > 0 in the RabbitMQ UI
+  (**http://localhost:15672**, login `brewline` / `brewline`).
+- **Time / impact:** diagnosis is read-only. The optional purge in step 4 is
+  irreversible.
 
 1. Open the RabbitMQ UI and note the depth of `brewline.dlq` and of the two work
    queues, `fulfillment.order.placed` and `notification.order.ready`.
+
 2. Find the exception that caused the dead-letter. A consumer nacks with requeue on the
    first failure and dead-letters on the redelivery, so the message failed twice:
+
    ```bash
    docker compose -f deploy/docker-compose.yml logs --tail 100 fulfillment notification
    ```
+
 3. Fix the underlying cause — most often Postgres is unavailable, which you confirm
    with `docker compose -f deploy/docker-compose.yml ps postgres`. Once the consumers
    are healthy, new orders drain normally.
@@ -246,9 +272,17 @@ configuration.
 1. Restore the default value — `BROKER_PROPAGATION=on` or `CARDINALITY_MODE=normal` in
    `.env`, or the default `command:` (`edge.yaml` / `gateway.yaml`) in
    `deploy/docker-compose.yml`.
+
 2. Recreate only the affected container:
+
    ```bash
    docker compose -f deploy/docker-compose.yml up -d --force-recreate <service>
+   ```
+
+   For example, to revert EX-01 after setting `BROKER_PROPAGATION=on`:
+
+   ```bash
+   docker compose -f deploy/docker-compose.yml up -d --force-recreate order fulfillment notification
    ```
 
 **Verify:** the symptom named in the matching experiment page is gone.
@@ -278,3 +312,7 @@ authoritative sources are, in order:
    implementation was built against.
 3. `.agents_workspace/DECISION_LOG.md` — implementation-time decisions and their
    trade-offs.
+
+---
+
+[← OP-01 Install and configure](OP-01-install-and-configure.md) · [Guide index](../index.md) · [OP-03 SLO alert drill →](OP-03-slo-alert-drill.md)

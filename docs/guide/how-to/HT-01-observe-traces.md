@@ -1,10 +1,13 @@
 # HT-01 — Observe traces
 
+[← Guide index](../index.md)
+
 Goal: read a Brewline order trace in Jaeger and recognize each hop.
 
-**Prerequisites:** the stack is running and you have placed at least one order
-(see [Getting started](../getting-started.md)).
-**Time:** ~10 minutes. This page is read-only — it changes nothing.
+- **Prerequisites:** the stack is running and you have placed at least one order (see
+  [Getting started](../getting-started.md)).
+- **Time:** ~10 minutes.
+- **Impact:** none. This page is read-only — it changes nothing.
 
 ## Find a trace
 
@@ -63,12 +66,16 @@ storefront  POST /orders
 
 Under normal load you will not see every order in Jaeger — the gateway's tail sampler
 keeps all errors and slow traces but only 5% of the rest. That is intentional; quantify
-it in [Experiment 4](../experiments/04-sampling-and-cost.md).
+it in [EX-04 — Sampling and cost](../experiments/EX-04-sampling-and-cost.md).
 
 ## If it fails
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Async spans never join the trace | Broker propagation off | Confirm `BROKER_PROPAGATION=on`; see [Experiment 1](../experiments/01-broken-broker-context.md) |
+| Async spans never join the trace | Broker propagation off | Confirm `BROKER_PROPAGATION=on`; see [EX-01](../experiments/EX-01-broken-broker-context.md) |
 | `inventory` spans missing / separate trace | Go propagator not set | Cross-language break; see [Concepts](../concepts.md#cross-language-propagation-python--go) |
 | No traces at all | Collector or Jaeger down | See [Troubleshooting](../troubleshooting.md) |
+
+---
+
+[Guide index](../index.md) · [HT-02 Observe metrics and logs →](HT-02-observe-metrics-and-logs.md)

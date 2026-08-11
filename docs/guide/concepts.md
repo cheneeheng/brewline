@@ -1,5 +1,7 @@
 # Concepts
 
+[← Guide index](index.md)
+
 What each OpenTelemetry idea looks like in Brewline, and where it lives in the code.
 Read this after [Getting started](getting-started.md) so you have a trace to look at.
 
@@ -22,7 +24,7 @@ The manual broker propagation is in
 headers) and [`services/fulfillment/worker.py`](../../services/fulfillment/worker.py)
 (`extract` → `attach` → start span → `ack`). Get the inject/extract pair right and the
 async spans join the storefront-rooted trace; miss it and the trace fragments — which
-is exactly [Experiment 1](experiments/01-broken-broker-context.md).
+is exactly [EX-01](experiments/EX-01-broken-broker-context.md).
 
 ## Cross-language propagation (Python → Go)
 
@@ -42,8 +44,8 @@ otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
 ```
 
 with the handler wrapped in `otelhttp.NewHandler`. This is the *same class of bug* as
-the broker fragment in Experiment 1, reached by a different cause — recognizing both is
-a core lesson.
+the broker fragment in EX-01, reached by a different cause — recognizing both is a core
+lesson.
 
 ## The three pillars and the collector pipeline
 
@@ -98,7 +100,7 @@ that turns `trace_id` into a link straight to the Jaeger trace. See
 **Cardinality discipline:** metric labels are restricted to bounded values
 (`outcome`, `sku`, `service.name`). High-cardinality identifiers like `order_id` are
 **never** metric labels — they live on spans and logs. Violating this on purpose is
-[Experiment 2](experiments/02-metric-cardinality.md).
+[EX-02](experiments/EX-02-metric-cardinality.md).
 
 > The Prometheus exporter rewrites OTel metric names: dots become underscores and
 > monotonic counters gain a `_total` suffix. So `brewline.orders.placed` is queried as
@@ -122,7 +124,7 @@ The critical tuning knob is `decision_wait: 15s`. It **must exceed the full
 end-to-end trace duration**, which includes the async `PREP_SECONDS` (default 2s)
 delay — otherwise the sampler decides before the fulfillment/notification spans arrive
 and persists incomplete traces (a failure that looks like a propagation bug but
-isn't). This makes [Experiment 4](experiments/04-sampling-and-cost.md) measurable.
+isn't). This makes [EX-04](experiments/EX-04-sampling-and-cost.md) measurable.
 
 ## SLOs and burn-rate alerting
 
