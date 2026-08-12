@@ -248,6 +248,21 @@ func main() {
 	defer rdb.Close()
 
 	r := chi.NewRouter()
+	// otelhttp names every span with the one string passed to NewHandler, so all
+	// three routes arrive as "inventory" and the waterfall cannot tell a reserve
+	// from an availability read. chi resolves the pattern during routing, so rename
+	// the server span on the way back out. The pattern, never r.URL.Path: the raw
+	// path would make /inventory/{sku} one span name per SKU.
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			next.ServeHTTP(w, req)
+			if p := chi.RouteContext(req.Context()).RoutePattern(); p != "" {
+				span := trace.SpanFromContext(req.Context())
+				span.SetName(req.Method + " " + p)
+				span.SetAttributes(semconv.HTTPRoute(p))
+			}
+		})
+	})
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 	})

@@ -62,7 +62,7 @@ k6 run -e STOREFRONT_URL=http://localhost:8000 loadgen/k6_order.js
    order         INSERT                              1ms  #
    order         COMMIT;                             3ms  #
    payment       POST /charge                       34ms  #
-   inventory     inventory                           4ms  .#
+   inventory     POST /reserve                       7ms  .#
    order         order.placed publish               10ms  .#
    fulfillment   fulfillment.process              2025ms  .##########################################
    fulfillment   order.ready publish                 9ms  ...........................................#
@@ -71,17 +71,14 @@ k6 run -e STOREFRONT_URL=http://localhost:8000 loadgen/k6_order.js
    42 spans in one trace, from fulfillment, inventory, notification, order, payment, storefront
 ```
 
-Abridged: a real run prints every span, which for this trace is 42 rows. The rest are
-auto-instrumented detail — one span per asyncpg statement (`BEGIN;`, `INSERT`,
-`COMMIT;`) and the ASGI `http receive` / `http send` pairs. Timings come from your run.
+Abridged: a real run prints every span, which for this trace is around 45 rows — the
+count moves with connection reuse. The rest are auto-instrumented detail: one span per
+asyncpg statement (`BEGIN;`, `INSERT`, `COMMIT;`) and the ASGI `http receive` /
+`http send` pairs. Timings come from your run.
 
 The part that matters: `fulfillment` and `notification` are in the same trace as
 `storefront`, seconds after the HTTP request finished, because the `traceparent`
 travelled inside the AMQP message headers.
-
-Every inventory span is named `inventory`, not `POST /reserve` — the Go service passes
-one fixed operation name to `otelhttp.NewHandler`, so the route does not reach the span
-name.
 
 ## Why an example may print nothing
 

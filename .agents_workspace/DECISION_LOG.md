@@ -307,3 +307,44 @@ transcript captured before this entry.
 **Outcome:** All five examples run clean in both flavours against the live stack. `05` now
 prints matching trace IDs ("same trace"), `02` reports six distinct services, `03` prints
 both SLI rules and the full rule names. All `.ps1` parse-clean, all `.sh` pass `bash -n`.
+
+### Entry 11
+
+**Type:** Decision
+**Mode:** Autonomous
+**Timestamp:** 2026-08-12T13:15:00Z
+**Task:** Resolve the two Go-side findings from entry 10; user delegated the judgement.
+
+**Context:** Both findings sit in service telemetry, which CLAUDE.md treats as the product
+rather than an implementation detail, so neither was safe to fix as a drive-by. Verified
+first, rather than inferred: `OTEL_SEMCONV_STABILITY_OPT_IN=http` does reach the inventory
+container (`docker inspect`), and otelhttp v0.53.0 contains no reference to
+`SEMCONV_STABILITY` in any of its 31 source files while hardcoding the metric name
+`http.server.duration`. The opt-in is therefore inert for Go by construction, not misconfigured.
+
+**Decision:** Split the two.
+
+*Fixed — span naming.* `otelhttp.NewHandler(r, "inventory")` gave all three routes the span
+name `inventory`, so a waterfall could not distinguish a reservation from an availability
+read. Added a chi middleware that renames the server span from the matched route pattern
+after routing and sets `http.route`. Used the pattern and never `r.URL.Path`: the raw path
+would make `/inventory/{sku}` one span name per SKU, trading a naming bug for an unbounded
+one. Chose the middleware over per-route `otelhttp.NewHandler` wrappers because the single
+outer handler stays the only place context extraction happens.
+
+*Declined — legacy metric names.* Emitting `http_server_request_duration_seconds_*` from Go
+requires otelhttp v0.58+, which requires otel core v1.28 -> v1.33+: the whole Go SDK, in a
+repo with no test suite and telemetry as the product. The cost is real but bounded and
+already documented — `inventory` is absent from example 03's per-service rate and from
+`red.json`, and both now say so. Rejected the cheap alternative of unioning the legacy series
+into the dashboard query, which would hide the divergence the rig exists to make visible.
+
+**Impact / Risk:** Span names for the inventory service change, so any saved Jaeger search on
+the operation name `inventory` breaks. No metric, log, or sampling behaviour changes — tail
+sampling keys on latency and errors, not span names.
+
+**Outcome:** `go build` and `go vet` clean. Jaeger now lists `POST /reserve`,
+`GET /inventory/{sku}`, and `inventory.available_qty` for the service; the GET span carries
+`http.route=/inventory/{sku}` with `http.target=/inventory/LAT-001`, confirming the pattern
+and not the path reaches the name. Updated the `examples/README.md` sample, which entry 10
+had just corrected to say the span is named `inventory`.
