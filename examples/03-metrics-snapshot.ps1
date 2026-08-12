@@ -59,8 +59,16 @@ Show-PromQuery 'Order latency p95, last 5m  (OTel: brewline.order.duration, unit
 Show-PromQuery 'Request rate by service, last 5m  (HTTP RED, stable semconv)' `
     'sum by (service_name) (rate(http_server_request_duration_seconds_count[5m]))' 'service_name'
 
+Write-Host ''
+Write-Note 'Only the Python services appear. inventory serves HTTP too, but the Go side'
+Write-Note 'still emits the legacy http_server_duration_milliseconds_* series, so a'
+Write-Note 'stable-semconv query cannot see it — the RED dashboard has the same gap.'
+
+# A name selector, not "A or B": the set operators match on label sets with
+# __name__ excluded, so two rules that carry no other labels look identical to
+# `or` and only the first would ever print.
 Show-PromQuery 'SLI recording rules, evaluated by Prometheus' `
-    'brewline:order_latency_p99_seconds:5m or brewline:payment_failure_ratio:5m' '__name__'
+    '{__name__=~"brewline:.+:5m"}' '__name__'
 
 Write-Say 'Cardinality: how many series each metric actually costs'
 Write-Note 'count by (__name__) ({__name__=~"brewline_.+"})'

@@ -57,21 +57,31 @@ k6 run -e STOREFRONT_URL=http://localhost:8000 loadgen/k6_order.js
 
 ```
    service       span                           duration  offset/length
-   storefront    POST /orders                      151ms  ###
-   order         POST /orders                      133ms  ##
-   payment       POST /charge                       47ms  #
-   inventory     POST /reserve                      19ms  .#
-   inventory     inventory.available_qty             6ms  .#
-   order         order.placed publish                7ms  ..#
-   fulfillment   fulfillment.process              2018ms  ...########################################
-   fulfillment   order.ready publish                 5ms  ...........................................#
-   notification  notification.notify                 4ms  ...........................................#
+   storefront    POST /orders                       80ms  #
+   order         POST /orders                       74ms  #
+   order         INSERT                              1ms  #
+   order         COMMIT;                             3ms  #
+   payment       POST /charge                       34ms  #
+   inventory     inventory                           4ms  .#
+   order         order.placed publish               10ms  .#
+   fulfillment   fulfillment.process              2025ms  .##########################################
+   fulfillment   order.ready publish                 9ms  ...........................................#
+   notification  notification.notify                 0ms  ...........................................#
+
+   42 spans in one trace, from fulfillment, inventory, notification, order, payment, storefront
 ```
 
-Shape, not literal values — span names, ordering, and timings come from your run. The
-part that matters: `fulfillment` and `notification` are in the same trace as
+Abridged: a real run prints every span, which for this trace is 42 rows. The rest are
+auto-instrumented detail — one span per asyncpg statement (`BEGIN;`, `INSERT`,
+`COMMIT;`) and the ASGI `http receive` / `http send` pairs. Timings come from your run.
+
+The part that matters: `fulfillment` and `notification` are in the same trace as
 `storefront`, seconds after the HTTP request finished, because the `traceparent`
 travelled inside the AMQP message headers.
+
+Every inventory span is named `inventory`, not `POST /reserve` — the Go service passes
+one fixed operation name to `otelhttp.NewHandler`, so the route does not reach the span
+name.
 
 ## Why an example may print nothing
 

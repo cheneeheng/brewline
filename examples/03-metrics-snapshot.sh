@@ -26,7 +26,11 @@ show() {
           "     (no series yet — place an order or run k6 first)"
         else
           .data.result[]
-          | ((if $lbl == "" then "total" else (.metric[$lbl] // "-") end) + "                    ")[0:20] as $k
+          | (if $lbl == "" then "total" else (.metric[$lbl] // "-") end) as $k0
+          # Pad to 20, never truncate: recording-rule names run to 37 characters,
+          # and PadRight in the .ps1 flavour does not cut them either.
+          | (if ($k0 | length) >= 20 then $k0
+             else ($k0 + "                    ")[0:20] end) as $k
           | (.value[1]) as $v
           | "     " + $k + " = "
             + (if ($v | test("NaN|Inf")) then $v
@@ -49,8 +53,16 @@ show "Order latency p95, last 5m  (OTel: brewline.order.duration, unit s)" \
 show "Request rate by service, last 5m  (HTTP RED, stable semconv)" \
   'sum by (service_name) (rate(http_server_request_duration_seconds_count[5m]))' service_name
 
+printf '\n'
+note "Only the Python services appear. inventory serves HTTP too, but the Go side"
+note "still emits the legacy http_server_duration_milliseconds_* series, so a"
+note "stable-semconv query cannot see it — the RED dashboard has the same gap."
+
+# A name selector, not "A or B": the set operators match on label sets with __name__
+# excluded, so two rules that carry no other labels look identical to `or` and only
+# the first would ever print.
 show "SLI recording rules, evaluated by Prometheus" \
-  'brewline:order_latency_p99_seconds:5m or brewline:payment_failure_ratio:5m' __name__
+  '{__name__=~"brewline:.+:5m"}' __name__
 
 say "Cardinality: how many series each metric actually costs"
 note 'count by (__name__) ({__name__=~"brewline_.+"})'

@@ -54,7 +54,9 @@ printf '   %-14s%-30s%9s  %s\n' service span duration "offset/length"
 render_waterfall <<<"$TRACE" | sed 's/^/   /'
 
 printf '\n'
-note "$(jq -r '.data[0].spans | length | "\(.) spans"' <<<"$TRACE") in one trace, from $(jq -r '[.data[0].processes[].serviceName] | sort | join(", ")' <<<"$TRACE")"
+# unique, not sort: Jaeger records one process per service *instance*, so order
+# and storefront repeat once per worker without the dedupe.
+note "$(jq -r '.data[0].spans | length | "\(.) spans"' <<<"$TRACE") in one trace, from $(jq -r '[.data[0].processes[].serviceName] | unique | join(", ")' <<<"$TRACE")"
 printf '\n'
 note "What to look for:"
 note "  * inventory spans nested under order — that hop is Python -> Go, and it"
@@ -63,7 +65,8 @@ note "    replaced explicitly (services/inventory/main.go)."
 note "  * fulfillment and notification spans in the *same* trace, seconds later."
 note "    Nothing called them over HTTP; the traceparent rode inside the AMQP"
 note "    message headers. Turning that off is EX-01."
-note "  * inventory.available_qty carries brewline.cache_hit — hand-set, because"
-note "    pgx and go-redis are not auto-instrumented here."
+note "  * the inventory span carries brewline.order_id and db.system, hand-set on"
+note "    the inbound server span because pgx is not auto-instrumented here. The"
+note "    cache_hit attribute sits on the GET path instead — example 04 shows it."
 printf '\n'
 note "Full detail, tags included: $JAEGER_URL/trace/$TRACE_ID"

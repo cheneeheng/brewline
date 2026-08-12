@@ -221,3 +221,89 @@ and jq's `strftime` makes UTC the cheap default. Both scripts label which they s
 
 **Outcome:** Six `.ps1` files added; all parse-clean, error paths exercised with the stack
 down, waterfall renderer verified byte-identical to the bash output against a fixture.
+
+### Entry 9
+
+**Type:** Decision
+**Mode:** Autonomous
+**Timestamp:** 2026-08-12T12:00:00Z
+**Task:** Run the five examples on a Windows/Docker Desktop host (user request).
+
+**Context:** The stack would not build. `services/inventory/Dockerfile` copied only `go.mod`,
+ran `go mod tidy`, and copied the sources afterwards. `tidy` resolves imports by reading the
+`.go` files, so with no sources present it pruned the requirements instead of writing a usable
+`go.sum`, and `go build` then failed on missing `go.sum` entries for every `otel/sdk` package.
+No `go.sum` has ever been tracked in git, so this broke every clean-checkout build — the Go
+build check in CLAUDE.md runs on the host, where a warm module cache hides it.
+
+**Decision:** Moved `COPY . .` above `RUN go mod tidy` — a two-line reorder. The alternative,
+committing a real `go.sum`, gives reproducible and offline-capable builds, but the Dockerfile
+comment ("network available at build time") records build-time resolution as a deliberate
+choice, so the smaller diff that preserves that choice won. Out of scope, flagged not fixed:
+without a committed `go.sum`, transitive dependency versions are resolved fresh at image build.
+
+**Impact / Risk:** Build-order only; no change to the Go source, the module graph, or any
+telemetry behaviour. Cost is cache efficiency — any source edit now invalidates the `tidy`
+layer, so rebuilds re-resolve modules.
+
+**Outcome:** `brewline-inventory` builds clean; all 15 containers up; all five examples run.
+Second, unrelated flake seen once and not fixed: `inventory-migrate` failed on first boot with
+"connection refused" because the `pg_isready` healthcheck probes the unix socket, which the
+init-phase temporary server already answers, so `service_healthy` went true before Postgres
+accepted TCP. It succeeded on a plain re-run. A first-boot-only race with `restart: "no"`.
+
+### Entry 10
+
+**Type:** Decision
+**Mode:** Autonomous
+**Timestamp:** 2026-08-12T12:45:00Z
+**Task:** Second pass over the examples — find and fix defects (user request).
+
+**Context:** Five defects, each producing plausible-looking output rather than an error, so
+none was visible without running both flavours against a live stack and checking the claims
+against Jaeger, Loki, and Prometheus:
+
+1. `02` listed Jaeger *processes*, not services, printing "fulfillment, fulfillment, order,
+   order, order, ..." for a six-service trace.
+2. `05` read `trace_id` from `values[][2]`. Loki 3.1 returns structured metadata in the
+   per-stream map, so the lookup always missed and the script printed a fallback claiming
+   this Loki build does not expose the field — untrue, and it disabled the log-to-trace
+   pivot, which is the whole point of the example.
+3. `02` told the reader to look for `inventory.available_qty` and `brewline.cache_hit`. That
+   span exists only on `GET /inventory/{sku}`; the order path calls `POST /reserve`, which
+   sets its attributes on the inbound server span and creates no child. The named span can
+   never appear in that trace.
+4. `03` padded the break-out label with jq `[0:20]`, which truncates — the 37-character
+   recording-rule name printed as `brewline:order_laten`. The `.ps1` flavour used
+   `PadRight(20)`, which does not truncate, so the two flavours disagreed.
+5. `03` queried `A or B` for the two SLI rules. Set operators match label sets with
+   `__name__` excluded; both rules carry no other labels, so they collide and `or` can only
+   ever return the first. The payment-failure SLI was unreachable by construction.
+
+**Decision:** Fixed all five in both flavours, keeping the sh/ps1 pair line-for-line per the
+README rule. For (5) used a name selector `{__name__=~"brewline:.+:5m"}` rather than two
+queries: one line, and it picks up new 5m rules automatically. For (4) padded without
+truncating rather than widening the column, which matches what PowerShell already did.
+Rewrote the `02` sample output in `examples/README.md`, which showed `POST /reserve` and
+`inventory.available_qty` — two spans an order trace cannot contain — and implied ~9 spans
+where a real run prints 42.
+
+Flagged, deliberately not fixed, because both change service telemetry and CLAUDE.md makes
+telemetry behaviour the product rather than an implementation detail:
+- `otelhttp.NewHandler(r, "inventory")` gives every inventory span the fixed name
+  `inventory`, so the route never reaches the span name. The README sample expecting
+  `POST /reserve` suggests route-based naming was the original intent.
+- The Go service emits legacy `http_server_duration_milliseconds_*` while the three Python
+  services emit stable `http_server_request_duration_seconds_*`. `inventory` inherits
+  `OTEL_SEMCONV_STABILITY_OPT_IN=http` through `x-otel-env` and emits the legacy names
+  anyway. Consequence: `inventory` is absent from example 03's per-service rate *and* from
+  the `red.json` dashboard, which uses the same stable-name query. Added a note to `03`
+  in both flavours so the gap is stated rather than silently present.
+
+**Impact / Risk:** Examples only; no service, collector, or compose change. The `03` SLI row
+and the `05` pivot now show data that was previously unreachable, so output differs from any
+transcript captured before this entry.
+
+**Outcome:** All five examples run clean in both flavours against the live stack. `05` now
+prints matching trace IDs ("same trace"), `02` reports six distinct services, `03` prints
+both SLI rules and the full rule names. All `.ps1` parse-clean, all `.sh` pass `bash -n`.

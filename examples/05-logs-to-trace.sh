@@ -72,7 +72,10 @@ jq -r '
     + .line' <<<"$RESULT"
 
 say "4. the pivot"
-FOUND_TID=$(jq -r '[.data.result[].values[][2].trace_id // empty] | first // ""' <<<"$RESULT")
+# trace_id rides in the per-stream map, not in the value tuple: Loki splits a stream
+# whenever the structured metadata differs, so every distinct trace_id comes back as
+# its own result entry alongside the resource labels.
+FOUND_TID=$(jq -r '[.data.result[].stream.trace_id // empty] | first // ""' <<<"$RESULT")
 if [ -n "$FOUND_TID" ]; then
   note "trace_id on the log lines : $FOUND_TID"
   note "trace_id we sent          : $TRACE_ID"
@@ -80,9 +83,10 @@ if [ -n "$FOUND_TID" ]; then
     note "-> same trace. Log line to waterfall in one click."
   fi
 else
-  note "This Loki build does not return structured metadata over the HTTP API, so"
-  note "the trace_id is not visible here. It is attached to the records, and"
-  note "Grafana's Loki datasource exposes it as the TraceID derived field."
+  note "These lines carry no trace_id, which means the log records reached Loki"
+  note "without span context — the SDK handler is attached but the lines were"
+  note "emitted outside any active span. Grafana shows the same field as the"
+  note "TraceID derived field on the Loki datasource."
 fi
 printf '\n'
 note "In Grafana that field is a link: http://localhost:3000/d/brewline-logs"

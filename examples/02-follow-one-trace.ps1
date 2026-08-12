@@ -53,7 +53,9 @@ Write-Say '3. the waterfall'
 Write-Host ('   {0}{1}{2}  {3}' -f 'service'.PadRight(14), 'span'.PadRight(30), 'duration'.PadLeft(9), 'offset/length')
 Show-Waterfall $trace | ForEach-Object { Write-Host "   $_" }
 
-$services = ($trace.data[0].processes.PSObject.Properties.Value.serviceName | Sort-Object) -join ', '
+# Distinct service names, not processes: Jaeger records one process per service
+# *instance*, so order and storefront repeat once per worker without the dedupe.
+$services = ($trace.data[0].processes.PSObject.Properties.Value.serviceName | Sort-Object -Unique) -join ', '
 Write-Host ''
 Write-Note "$($trace.data[0].spans.Count) spans in one trace, from $services"
 Write-Host ''
@@ -64,7 +66,8 @@ Write-Note '    replaced explicitly (services/inventory/main.go).'
 Write-Note '  * fulfillment and notification spans in the *same* trace, seconds later.'
 Write-Note '    Nothing called them over HTTP; the traceparent rode inside the AMQP'
 Write-Note '    message headers. Turning that off is EX-01.'
-Write-Note '  * inventory.available_qty carries brewline.cache_hit — hand-set, because'
-Write-Note '    pgx and go-redis are not auto-instrumented here.'
+Write-Note '  * the inventory span carries brewline.order_id and db.system, hand-set on'
+Write-Note '    the inbound server span because pgx is not auto-instrumented here. The'
+Write-Note '    cache_hit attribute sits on the GET path instead — example 04 shows it.'
 Write-Host ''
 Write-Note "Full detail, tags included: $JaegerUrl/trace/$traceId"

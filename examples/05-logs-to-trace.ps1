@@ -49,13 +49,16 @@ foreach ($attempt in 1..12) {
         }
     } catch { $null }
 
+    # trace_id rides in the per-stream map, not in the value tuple: Loki splits a
+    # stream whenever the structured metadata differs, so every distinct trace_id
+    # comes back as its own result entry alongside the resource labels.
     $found = foreach ($stream in $fetched.data.result) {
         foreach ($value in $stream.values) {
             [pscustomobject]@{
                 Ts      = [long]$value[0]
                 Service = $stream.stream.service_name ?? '?'
                 Line    = $value[1]
-                TraceId = if ($value.Count -ge 3) { $value[2].trace_id } else { $null }
+                TraceId = $stream.stream.trace_id
             }
         }
     }
@@ -91,9 +94,10 @@ if ($foundId) {
         Write-Note '-> same trace. Log line to waterfall in one click.'
     }
 } else {
-    Write-Note 'This Loki build does not return structured metadata over the HTTP API, so'
-    Write-Note 'the trace_id is not visible here. It is attached to the records, and'
-    Write-Note "Grafana's Loki datasource exposes it as the TraceID derived field."
+    Write-Note 'These lines carry no trace_id, which means the log records reached Loki'
+    Write-Note 'without span context — the SDK handler is attached but the lines were'
+    Write-Note 'emitted outside any active span. Grafana shows the same field as the'
+    Write-Note 'TraceID derived field on the Loki datasource.'
 }
 Write-Host ''
 Write-Note 'In Grafana that field is a link: http://localhost:3000/d/brewline-logs'
